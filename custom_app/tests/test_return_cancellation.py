@@ -1,12 +1,9 @@
 import unittest
 import frappe
 from frappe.utils import flt, nowdate
+from erpnext.controllers.sales_and_purchase_return import make_return_doc
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
-from custom_app.utils import (
-	cancel_linked_payment_entries,
-	make_sales_return,
-	custom_make_return_doc,
-)
+from custom_app.utils import cancel_linked_payment_entries
 
 
 class TestReturnPaymentCancellation(unittest.TestCase):
@@ -49,7 +46,34 @@ class TestReturnPaymentCancellation(unittest.TestCase):
 		si.reload()
 		return si, pe
 
-	def test_cancel_linked_payment_entries_function(self):
+	def test_creating_draft_return_does_not_cancel_payment_entry(self):
+		si, pe = self._create_paid_sales_invoice()
+		self.assertEqual(pe.docstatus, 1)
+
+		# User clicks Return / Credit note -> creates draft return document
+		return_doc = make_return_doc("Sales Invoice", si.name)
+
+		pe.reload()
+		# Payment entry must STILL be submitted (not cancelled)
+		self.assertEqual(pe.docstatus, 1)
+		self.assertEqual(return_doc.is_return, 1)
+		self.assertEqual(return_doc.return_against, si.name)
+
+	def test_submitting_return_invoice_cancels_payment_entry(self):
+		si, pe = self._create_paid_sales_invoice()
+		self.assertEqual(pe.docstatus, 1)
+
+		return_doc = make_return_doc("Sales Invoice", si.name)
+		return_doc.insert(ignore_permissions=True)
+		# User submits the return invoice
+		return_doc.submit()
+
+		pe.reload()
+		# Payment entry must now be cancelled
+		self.assertEqual(pe.docstatus, 2)
+		self.assertEqual(return_doc.docstatus, 1)
+
+	def test_cancel_linked_payment_entries_direct(self):
 		si, pe = self._create_paid_sales_invoice()
 		self.assertEqual(pe.docstatus, 1)
 
@@ -58,38 +82,3 @@ class TestReturnPaymentCancellation(unittest.TestCase):
 
 		pe.reload()
 		self.assertEqual(pe.docstatus, 2)
-
-	def test_make_sales_return_cancels_payment_entry(self):
-		si, pe = self._create_paid_sales_invoice()
-		self.assertEqual(pe.docstatus, 1)
-
-		return_doc = make_sales_return(si.name)
-
-		pe.reload()
-		self.assertEqual(pe.docstatus, 2)
-		self.assertEqual(return_doc.is_return, 1)
-		self.assertEqual(return_doc.return_against, si.name)
-		self.assertEqual(flt(return_doc.items[0].qty), -1)
-
-	def test_custom_make_return_doc_cancels_payment_entry(self):
-		si, pe = self._create_paid_sales_invoice()
-		self.assertEqual(pe.docstatus, 1)
-
-		return_doc = custom_make_return_doc("Sales Invoice", si.name)
-
-		pe.reload()
-		self.assertEqual(pe.docstatus, 2)
-		self.assertEqual(return_doc.is_return, 1)
-		self.assertEqual(return_doc.return_against, si.name)
-
-	def test_return_invoice_submission_cancels_payment_entry(self):
-		si, pe = self._create_paid_sales_invoice()
-		self.assertEqual(pe.docstatus, 1)
-
-		return_doc = custom_make_return_doc("Sales Invoice", si.name)
-		return_doc.insert(ignore_permissions=True)
-		return_doc.submit()
-
-		pe.reload()
-		self.assertEqual(pe.docstatus, 2)
-		self.assertEqual(return_doc.docstatus, 1)

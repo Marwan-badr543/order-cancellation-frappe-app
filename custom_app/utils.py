@@ -1,6 +1,5 @@
 import frappe
 from frappe import _
-import erpnext.controllers.sales_and_purchase_return
 
 
 def cancel_linked_payment_entries(doctype: str, docname: str):
@@ -52,59 +51,10 @@ def cancel_linked_payment_entries(doctype: str, docname: str):
 	return cancelled
 
 
-@frappe.whitelist()
-def make_sales_return(source_name, target_doc=None):
-	"""
-	Overridden handler for Sales Invoice return / credit note.
-	Cancels any linked Payment Entry for the original invoice before creating the return document.
-	"""
-	cancel_linked_payment_entries("Sales Invoice", source_name)
-	return erpnext.controllers.sales_and_purchase_return.make_return_doc(
-		"Sales Invoice", source_name, target_doc
-	)
-
-
-@frappe.whitelist()
-def make_debit_note(source_name, target_doc=None):
-	"""
-	Overridden handler for Purchase Invoice return / debit note.
-	Cancels any linked Payment Entry for the original invoice before creating the return document.
-	"""
-	cancel_linked_payment_entries("Purchase Invoice", source_name)
-	return erpnext.controllers.sales_and_purchase_return.make_return_doc(
-		"Purchase Invoice", source_name, target_doc
-	)
-
-
-@frappe.whitelist()
-def make_pos_sales_return(source_name, target_doc=None):
-	"""
-	Overridden handler for POS Invoice return.
-	Cancels any linked Payment Entry for the original invoice before creating the return document.
-	"""
-	cancel_linked_payment_entries("POS Invoice", source_name)
-	return erpnext.controllers.sales_and_purchase_return.make_return_doc(
-		"POS Invoice", source_name, target_doc
-	)
-
-
-@frappe.whitelist()
-def custom_make_return_doc(doctype: str, source_name: str, target_doc=None):
-	"""
-	Overridden handler for general make_return_doc.
-	Cancels linked payment entries if doctype is Sales Invoice, Purchase Invoice, or POS Invoice.
-	"""
-	if doctype in ("Sales Invoice", "Purchase Invoice", "POS Invoice"):
-		cancel_linked_payment_entries(doctype, source_name)
-	return erpnext.controllers.sales_and_purchase_return.make_return_doc(
-		doctype, source_name, target_doc
-	)
-
-
 def on_return_invoice_before_submit(doc, method=None):
 	"""
 	Doc event triggered before submitting a return invoice.
-	Ensures that any remaining submitted Payment Entries linked to the original invoice are cancelled.
+	Cancels all submitted Payment Entries linked to the original invoice.
 	"""
 	if getattr(doc, "is_return", 0) and getattr(doc, "return_against", None):
 		cancel_linked_payment_entries(doc.doctype, doc.return_against)
