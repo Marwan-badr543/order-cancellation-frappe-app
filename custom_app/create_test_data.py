@@ -8,7 +8,7 @@ from erpnext.selling.doctype.sales_order.sales_order import (
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 
 
-def create_demo_data_for_user():
+def create_demo_data_for_user(submit_dn=False):
 	company = frappe.db.get_value("Company", {}, "name") or "marwan"
 	customer = frappe.db.get_value("Customer", {}, "name") or "marwan"
 	item = frappe.db.get_value("Item", {"is_sales_item": 1, "has_serial_no": 1}, "name") or "marwan code"
@@ -60,8 +60,14 @@ def create_demo_data_for_user():
 	dn = make_delivery_note(so.name)
 	dn.items[0].serial_no = serial_no_id
 	dn.insert(ignore_permissions=True)
-	dn.submit()
-	print(f"-> Delivery Note created and submitted: {dn.name} (Linked to SO: {so.name})")
+	if submit_dn:
+		dn.submit()
+		dn_status_label = "Submitted"
+	else:
+		dn_status_label = "Draft"
+		# Set serial number status to Inactive to test that it gets re-activated
+		frappe.db.set_value("Serial No", serial_no_id, "status", "Inactive")
+	print(f"-> Delivery Note created ({dn_status_label}): {dn.name} (Linked to SO: {so.name})")
 
 	# 5. Create Payment Entry against Sales Invoice
 	print("5. Creating Payment Entry for Sales Invoice...")
@@ -81,7 +87,7 @@ def create_demo_data_for_user():
 	print("NEW TEST DATA CREATED SUCCESSFULLY:")
 	print(f"Sales Invoice : {si.name} (Status: Paid, Linked to SO: {so.name})")
 	print(f"Sales Order   : {so.name} (Status: Submitted)")
-	print(f"Delivery Note : {dn.name} (Status: Submitted, Linked to SO: {so.name})")
+	print(f"Delivery Note : {dn.name} (Status: {dn_status_label}, Linked to SO: {so.name})")
 	print(f"Payment Entry : {pe.name} (Status: Submitted)")
 	print(f"Serial Number : {serial_no_id} (Status: {sn_status})")
 	print("=" * 60)
@@ -92,8 +98,9 @@ def create_demo_data_for_user():
 		"delivery_note": dn.name,
 		"payment_entry": pe.name,
 		"serial_no": serial_no_id,
+		"dn_status": dn_status_label,
 	}
 
 
 if __name__ == "__main__":
-	create_demo_data_for_user()
+	create_demo_data_for_user(submit_dn=False)
