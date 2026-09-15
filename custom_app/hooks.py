@@ -20,6 +20,7 @@ doctype_js = {
 
 doc_events = {
 	"Sales Invoice": {
+		"validate": "custom_app.utils.on_return_invoice_validate",
 		"before_submit": "custom_app.utils.on_return_invoice_before_submit",
 		"on_submit": "custom_app.utils.on_return_invoice_on_submit",
 	},

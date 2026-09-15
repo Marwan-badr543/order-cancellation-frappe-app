@@ -162,8 +162,8 @@ def get_serial_numbers_from_docs(docs):
 
 def cancel_linked_documents_and_activate_serials(doctype: str, docname: str, return_doc=None):
 	"""
-	Cancels Payment Entries, Delivery Notes, Sales Orders linked to the invoice,
-	and activates all associated Serial Numbers.
+	Cancels Payment Entries, Delivery Notes (if submitted), Sales Orders (if submitted)
+	linked to the invoice, and activates all associated Serial Numbers.
 	"""
 	if doctype != "Sales Invoice" or not docname:
 		return
@@ -179,7 +179,7 @@ def cancel_linked_documents_and_activate_serials(doctype: str, docname: str, ret
 
 	docs_for_serials = [orig_si, return_doc]
 
-	# 3. Cancel linked Delivery Notes (if submitted, docstatus == 1)
+	# 3. Cancel linked Delivery Notes (only if submitted, docstatus == 1; ignore if draft)
 	cancelled_dns = []
 	for dn_name in delivery_notes:
 		if frappe.db.exists("Delivery Note", dn_name):
@@ -191,7 +191,7 @@ def cancel_linked_documents_and_activate_serials(doctype: str, docname: str, ret
 					frappe.db.sql(
 						"""
 						UPDATE `tabSales Invoice Item`
-						SET delivery_note = ''
+						SET delivery_note = '', dn_detail = ''
 						WHERE delivery_note = %s
 						""",
 						(dn_name,),
@@ -199,7 +199,7 @@ def cancel_linked_documents_and_activate_serials(doctype: str, docname: str, ret
 					frappe.db.sql(
 						"""
 						UPDATE `tabDelivery Note Item`
-						SET against_sales_invoice = ''
+						SET against_sales_invoice = '', si_detail = ''
 						WHERE parent = %s
 						""",
 						(dn_name,),
@@ -217,7 +217,7 @@ def cancel_linked_documents_and_activate_serials(doctype: str, docname: str, ret
 						)
 					)
 
-	# 4. Cancel linked Sales Orders (if submitted, docstatus == 1)
+	# 4. Cancel linked Sales Orders (only if submitted, docstatus == 1; ignore if draft)
 	cancelled_sos = []
 	for so_name in sales_orders:
 		if frappe.db.exists("Sales Order", so_name):
@@ -229,7 +229,7 @@ def cancel_linked_documents_and_activate_serials(doctype: str, docname: str, ret
 					frappe.db.sql(
 						"""
 						UPDATE `tabSales Invoice Item`
-						SET sales_order = ''
+						SET sales_order = '', so_detail = ''
 						WHERE sales_order = %s
 						""",
 						(so_name,),
@@ -238,6 +238,7 @@ def cancel_linked_documents_and_activate_serials(doctype: str, docname: str, ret
 						for item in (return_doc.get("items") or []):
 							if getattr(item, "sales_order", None) == so_name:
 								item.sales_order = None
+								item.so_detail = None
 
 					so_doc.cancel()
 					cancelled_sos.append(so_name)
@@ -272,6 +273,26 @@ def cancel_linked_documents_and_activate_serials(doctype: str, docname: str, ret
 		frappe.msgprint("<br>".join(messages), alert=True)
 
 
+def on_return_invoice_validate(doc, method=None):
+	"""
+	Doc event triggered on validate of a return invoice.
+	Clears sales_order and delivery_note from return invoice items
+	to prevent ERPNext validation errors about cancelled documents.
+	"""
+	if getattr(doc, "is_return", 0) and getattr(doc, "return_against", None) and doc.doctype == "Sales Invoice":
+		for item in (doc.get("items") or []):
+			if item.get("delivery_note"):
+				dn_status = frappe.db.get_value("Delivery Note", item.delivery_note, "docstatus")
+				if dn_status != 1:
+					item.delivery_note = None
+					item.dn_detail = None
+			if item.get("sales_order"):
+				so_status = frappe.db.get_value("Sales Order", item.sales_order, "docstatus")
+				if so_status != 1:
+					item.sales_order = None
+					item.so_detail = None
+
+
 def on_return_invoice_before_submit(doc, method=None):
 	"""
 	Doc event triggered before submitting a return invoice.
@@ -280,6 +301,13 @@ def on_return_invoice_before_submit(doc, method=None):
 	"""
 	if getattr(doc, "is_return", 0) and getattr(doc, "return_against", None):
 		if doc.doctype == "Sales Invoice":
+			# Clear delivery_note and sales_order on return invoice items before submit
+			for item in (doc.get("items") or []):
+				item.delivery_note = None
+				item.dn_detail = None
+				item.sales_order = None
+				item.so_detail = None
+
 			cancel_linked_documents_and_activate_serials(
 				doc.doctype, doc.return_against, return_doc=doc
 			)
