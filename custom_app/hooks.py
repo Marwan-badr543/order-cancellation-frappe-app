@@ -1,7 +1,7 @@
 app_name = "custom_app"
 app_title = "Custom App"
 app_publisher = "Marwan Badr"
-app_description = "Custom App to cancel payment entry on return invoice submission"
+app_description = "Custom App to cancel payment entry, sales order, delivery note and activate serial numbers on return invoice submission"
 app_email = "marwanbadr@gmail.com"
 app_license = "MIT"
 
@@ -21,6 +21,7 @@ doctype_js = {
 doc_events = {
 	"Sales Invoice": {
 		"before_submit": "custom_app.utils.on_return_invoice_before_submit",
+		"on_submit": "custom_app.utils.on_return_invoice_on_submit",
 	},
 	"Purchase Invoice": {
 		"before_submit": "custom_app.utils.on_return_invoice_before_submit",
