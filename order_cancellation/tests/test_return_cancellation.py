@@ -8,7 +8,7 @@ from erpnext.selling.doctype.sales_order.sales_order import (
 	make_delivery_note,
 	make_sales_invoice as make_sales_invoice_from_so,
 )
-from custom_app.utils import (
+from order_cancellation.utils import (
 	cancel_linked_payment_entries,
 	get_linked_sales_orders,
 	get_linked_delivery_notes,

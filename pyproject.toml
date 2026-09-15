@@ -1,9 +1,9 @@
 [project]
-name = "custom_app"
+name = "order_cancellation"
 authors = [
     { name = "Marwan Badr", email = "marwanbadr@gmail.com"}
 ]
-description = "Custom App to cancel payment entry on return invoice"
+description = "Frappe App to cancel linked Payment Entries, Sales Orders, Delivery Notes and activate Serial Numbers on return invoice submission"
 requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]

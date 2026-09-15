@@ -3,5 +3,5 @@
 *.egg-info
 *.swp
 tags
-custom_app/docs/current
+order_cancellation/docs/current
 node_modules/
